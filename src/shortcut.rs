@@ -53,9 +53,11 @@ fn ensure_gnome() -> Result {
     if gnome_available() {
         return Ok(());
     }
-    Err("bureau non-GNOME : associez Super+V à « clipboard-history show » \
+    Err(
+        "bureau non-GNOME : associez Super+V à « clipboard-history show » \
          dans les réglages de votre bureau"
-        .into())
+            .into(),
+    )
 }
 
 /// GNOME opens the notification list with Super+V; Super+M still does.
@@ -65,8 +67,13 @@ fn free_shortcut_from_message_tray() -> Result {
     }
     let shell = gio::Settings::new(SHELL_KEYBINDINGS);
     let keys = strings(&shell, MESSAGE_TRAY_KEY);
-    let kept: Vec<String> = keys.into_iter().filter(|k| !k.eq_ignore_ascii_case(SHORTCUT)).collect();
-    shell.set_strv(MESSAGE_TRAY_KEY, kept).map_err(|e| e.to_string())
+    let kept: Vec<String> = keys
+        .into_iter()
+        .filter(|k| !k.eq_ignore_ascii_case(SHORTCUT))
+        .collect();
+    shell
+        .set_strv(MESSAGE_TRAY_KEY, kept)
+        .map_err(|e| e.to_string())
 }
 
 fn restore_message_tray() {
@@ -82,21 +89,32 @@ fn register_keybinding() -> Result {
         return Ok(());
     }
     paths.push(KEYBINDING_PATH.into());
-    media_keys.set_strv(CUSTOM_KEYBINDINGS_KEY, paths).map_err(|e| e.to_string())
+    media_keys
+        .set_strv(CUSTOM_KEYBINDINGS_KEY, paths)
+        .map_err(|e| e.to_string())
 }
 
 fn unregister_keybinding() -> Result {
     let media_keys = gio::Settings::new(MEDIA_KEYS);
     let paths = strings(&media_keys, CUSTOM_KEYBINDINGS_KEY);
-    let kept: Vec<String> = paths.into_iter().filter(|path| path != KEYBINDING_PATH).collect();
-    media_keys.set_strv(CUSTOM_KEYBINDINGS_KEY, kept).map_err(|e| e.to_string())
+    let kept: Vec<String> = paths
+        .into_iter()
+        .filter(|path| path != KEYBINDING_PATH)
+        .collect();
+    media_keys
+        .set_strv(CUSTOM_KEYBINDINGS_KEY, kept)
+        .map_err(|e| e.to_string())
 }
 
 fn configure_keybinding() -> Result {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let binding = keybinding_settings();
     let command = format!("{} show", exe.display());
-    for (key, value) in [("name", "Clipboard History"), ("command", &command), ("binding", SHORTCUT)] {
+    for (key, value) in [
+        ("name", "Clipboard History"),
+        ("command", &command),
+        ("binding", SHORTCUT),
+    ] {
         binding.set_string(key, value).map_err(|e| e.to_string())?;
     }
     Ok(())
@@ -121,9 +139,10 @@ fn mark_installed() -> Result {
 fn unmark_installed() -> Result {
     let marker = marker();
     match std::fs::remove_file(&marker) {
-        Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
-            Err(format!("impossible de supprimer {} : {e}", marker.display()))
-        }
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(format!(
+            "impossible de supprimer {} : {e}",
+            marker.display()
+        )),
         _ => Ok(()),
     }
 }
@@ -132,7 +151,9 @@ fn unmark_installed() -> Result {
 
 /// File marking that the shortcut was configured once for this user.
 fn marker() -> PathBuf {
-    gtk::glib::user_config_dir().join("clipboard-history").join("shortcut-installed")
+    gtk::glib::user_config_dir()
+        .join("clipboard-history")
+        .join("shortcut-installed")
 }
 
 fn has_schema(id: &str) -> bool {

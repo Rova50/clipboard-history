@@ -74,7 +74,13 @@ impl Watcher {
         )?;
         conn.flush()?;
         // Read whatever the clipboard holds at startup.
-        Ok(Self { conn, window, atoms, owner_changed: true, transfers: 0 })
+        Ok(Self {
+            conn,
+            window,
+            atoms,
+            owner_changed: true,
+            transfers: 0,
+        })
     }
 
     fn run(&mut self, copies: &async_channel::Sender<String>) -> Result<()> {
@@ -111,7 +117,8 @@ impl Watcher {
             return Ok(false);
         };
         let targets: Vec<Atom> = reply.value32().map(Iterator::collect).unwrap_or_default();
-        Ok(targets.contains(&self.atoms.UTF8_STRING) && !targets.contains(&self.atoms.PASSWORD_HINT))
+        Ok(targets.contains(&self.atoms.UTF8_STRING)
+            && !targets.contains(&self.atoms.PASSWORD_HINT))
     }
 
     /// The clipboard converted to `target`, whether sent at once or in chunks.
@@ -181,14 +188,17 @@ impl Watcher {
     }
 
     fn property_size(&self, property: Atom) -> Result<usize> {
-        let reply = self.conn.get_property(false, self.window, property, AtomEnum::ANY, 0, 0)?;
+        let reply = self
+            .conn
+            .get_property(false, self.window, property, AtomEnum::ANY, 0, 0)?;
         Ok(reply.reply()?.bytes_after as usize)
     }
 
     fn get_property(&self, property: Atom, size: usize) -> Result<GetPropertyReply> {
         let length = size.div_ceil(4) as u32;
         let reply =
-            self.conn.get_property(false, self.window, property, AtomEnum::ANY, 0, length)?;
+            self.conn
+                .get_property(false, self.window, property, AtomEnum::ANY, 0, length)?;
         Ok(reply.reply()?)
     }
 

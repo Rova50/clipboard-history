@@ -81,7 +81,10 @@ mod tests {
 
     #[test]
     fn unknown_commands_are_reported_with_their_name() {
-        assert_eq!(Command::parse(Some("paste")), Command::Unknown("paste".into()));
+        assert_eq!(
+            Command::parse(Some("paste")),
+            Command::Unknown("paste".into())
+        );
     }
 
     #[test]

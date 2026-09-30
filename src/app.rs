@@ -71,7 +71,9 @@ fn start_daemon(app: &gtk::Application, state: &SharedState) {
 }
 
 fn install_css() {
-    let Some(display) = gdk::Display::default() else { return };
+    let Some(display) = gdk::Display::default() else {
+        return;
+    };
     let provider = gtk::CssProvider::new();
     provider.load_from_data(CSS);
     gtk::style_context_add_provider_for_display(
@@ -103,7 +105,10 @@ fn execute(
         Command::List => print_history(cmdline, &state.borrow().history),
         Command::Clear => state.borrow_mut().history.clear(),
         other => {
-            print_error(cmdline, &format!("Commande non gérée : {other:?}\n\n{USAGE}"));
+            print_error(
+                cmdline,
+                &format!("Commande non gérée : {other:?}\n\n{USAGE}"),
+            );
             return glib::ExitCode::FAILURE;
         }
     }
@@ -127,12 +132,18 @@ fn print_output(cmdline: &gio::ApplicationCommandLine, message: &str) {
 
 /// Prints on the error output of the process that sent the command.
 fn print_error(cmdline: &gio::ApplicationCommandLine, message: &str) {
-    print_remote(cmdline, message, gio::ffi::g_application_command_line_printerr);
+    print_remote(
+        cmdline,
+        message,
+        gio::ffi::g_application_command_line_printerr,
+    );
 }
 
 fn print_remote(cmdline: &gio::ApplicationCommandLine, message: &str, printer: RemotePrinter) {
     use glib::translate::ToGlibPtr;
-    let Ok(message) = CString::new(message) else { return };
+    let Ok(message) = CString::new(message) else {
+        return;
+    };
     // SAFETY: "%s" consumes exactly one NUL-terminated string argument.
     unsafe { printer(cmdline.to_glib_none().0, c"%s".as_ptr(), message.as_ptr()) };
 }

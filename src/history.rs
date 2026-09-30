@@ -19,7 +19,10 @@ impl Default for History {
 
 impl History {
     pub fn new(capacity: usize) -> Self {
-        Self { entries: Vec::new(), capacity }
+        Self {
+            entries: Vec::new(),
+            capacity,
+        }
     }
 
     /// Puts `text` at the top, moving it there if it was already present.

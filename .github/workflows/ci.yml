@@ -1,0 +1,77 @@
+# Built on the oldest supported Ubuntu, so that the .deb links against an old
+# glibc/GTK and installs on Ubuntu 22.04+, Debian 12+ and derivatives.
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  SYSTEM_PACKAGES: libgtk-4-dev xvfb
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends $SYSTEM_PACKAGES
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets --locked -- -D warnings
+      - name: Tests (the X11 ones run under Xvfb and must not be skipped)
+        run: cargo test --locked
+        env:
+          CLIPBOARD_HISTORY_REQUIRE_XVFB: "1"
+
+  package:
+    needs: test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends $SYSTEM_PACKAGES
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deb
+      - name: Check that the tag matches the version in Cargo.toml
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
+          test "v$version" = "$GITHUB_REF_NAME" || {
+            echo "::error::tag $GITHUB_REF_NAME ≠ version $version de Cargo.toml"; exit 1; }
+      - name: Build the .deb
+        run: |
+          cargo deb --locked
+          # Stable name, for the ".../releases/latest/download/..." link.
+          cp target/debian/clipboard-history_*.deb target/debian/clipboard-history_amd64.deb
+      - name: Show the package dependencies
+        run: dpkg-deb --field target/debian/clipboard-history_amd64.deb Depends
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clipboard-history-deb
+          path: target/debian/*.deb
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: clipboard-history-deb
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: "*.deb"
+          generate_release_notes: true

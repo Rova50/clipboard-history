@@ -62,7 +62,9 @@ struct Picker {
 
 impl Picker {
     fn new(app: &gtk::Application, state: &SharedState) -> Rc<Self> {
-        let search = gtk::SearchEntry::builder().placeholder_text("Rechercher…").build();
+        let search = gtk::SearchEntry::builder()
+            .placeholder_text("Rechercher…")
+            .build();
         let list = build_list();
         let scroller = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
@@ -104,7 +106,8 @@ impl Picker {
     fn connect_search(self: &Rc<Self>) {
         let weak = Rc::downgrade(self);
         self.list.set_filter_func(move |row| {
-            weak.upgrade().is_none_or(|picker| picker.row_matches_search(row))
+            weak.upgrade()
+                .is_none_or(|picker| picker.row_matches_search(row))
         });
         let picker = self.clone();
         self.search.connect_search_changed(move |_| {
@@ -115,7 +118,8 @@ impl Picker {
 
     fn connect_choice(self: &Rc<Self>) {
         let picker = self.clone();
-        self.list.connect_row_activated(move |_, row| picker.choose(row));
+        self.list
+            .connect_row_activated(move |_, row| picker.choose(row));
     }
 
     fn connect_keys(self: &Rc<Self>) {
@@ -167,7 +171,9 @@ impl Picker {
     }
 
     fn choose(&self, row: &gtk::ListBoxRow) {
-        let Some(text) = self.entry_of(row) else { return };
+        let Some(text) = self.entry_of(row) else {
+            return;
+        };
         WidgetExt::display(&self.window).clipboard().set_text(&text);
         self.state.borrow_mut().history.push(text);
         self.window.close();
@@ -175,7 +181,9 @@ impl Picker {
     }
 
     fn remove_selected(&self) {
-        let Some(row) = self.list.selected_row() else { return };
+        let Some(row) = self.list.selected_row() else {
+            return;
+        };
         let text = self.entries.borrow_mut().remove(row.index() as usize);
         self.state.borrow_mut().history.remove(&text);
         self.select_relative(1);
@@ -207,7 +215,9 @@ impl Picker {
     }
 
     fn selected_visible_row(&self) -> Option<gtk::ListBoxRow> {
-        self.list.selected_row().filter(|row| row.is_child_visible())
+        self.list
+            .selected_row()
+            .filter(|row| row.is_child_visible())
     }
 
     fn select_first(&self) {
@@ -232,7 +242,9 @@ impl Picker {
 
     /// Keeps `row` in view while the focus stays in the search field.
     fn scroll_to(&self, row: &gtk::ListBoxRow) {
-        let Some(bounds) = row.compute_bounds(&self.list) else { return };
+        let Some(bounds) = row.compute_bounds(&self.list) else {
+            return;
+        };
         let adjustment = self.scroller.vadjustment();
         let top = f64::from(bounds.y());
         let bottom = f64::from(bounds.y() + bounds.height());
@@ -251,7 +263,9 @@ fn build_window(
     search: &gtk::SearchEntry,
     scroller: &gtk::ScrolledWindow,
 ) -> gtk::ApplicationWindow {
-    let hint = gtk::Label::new(Some("↑/↓ défiler · Entrée coller · Suppr retirer · Échap fermer"));
+    let hint = gtk::Label::new(Some(
+        "↑/↓ défiler · Entrée coller · Suppr retirer · Échap fermer",
+    ));
     hint.add_css_class("hint");
 
     let layout = gtk::Box::builder()
@@ -283,7 +297,9 @@ fn build_list() -> gtk::ListBox {
     let list = gtk::ListBox::new();
     list.set_selection_mode(gtk::SelectionMode::Browse);
     list.set_activate_on_single_click(true);
-    list.set_placeholder(Some(&gtk::Label::new(Some("Aucune copie dans cette session"))));
+    list.set_placeholder(Some(&gtk::Label::new(Some(
+        "Aucune copie dans cette session",
+    ))));
     list
 }
 
@@ -316,14 +332,23 @@ mod tests {
     fn arrows_and_tab_move_the_selection() {
         assert_eq!(action_for(gdk::Key::Down, NONE, false), Some(Action::Next));
         assert_eq!(action_for(gdk::Key::Tab, NONE, false), Some(Action::Next));
-        assert_eq!(action_for(gdk::Key::Up, NONE, false), Some(Action::Previous));
-        assert_eq!(action_for(gdk::Key::ISO_Left_Tab, NONE, false), Some(Action::Previous));
+        assert_eq!(
+            action_for(gdk::Key::Up, NONE, false),
+            Some(Action::Previous)
+        );
+        assert_eq!(
+            action_for(gdk::Key::ISO_Left_Tab, NONE, false),
+            Some(Action::Previous)
+        );
     }
 
     #[test]
     fn super_v_again_moves_to_the_next_entry() {
         let super_key = gdk::ModifierType::SUPER_MASK;
-        assert_eq!(action_for(gdk::Key::v, super_key, false), Some(Action::Next));
+        assert_eq!(
+            action_for(gdk::Key::v, super_key, false),
+            Some(Action::Next)
+        );
     }
 
     #[test]
@@ -333,14 +358,26 @@ mod tests {
 
     #[test]
     fn delete_removes_an_entry_only_outside_a_search() {
-        assert_eq!(action_for(gdk::Key::Delete, NONE, false), Some(Action::Remove));
+        assert_eq!(
+            action_for(gdk::Key::Delete, NONE, false),
+            Some(Action::Remove)
+        );
         assert_eq!(action_for(gdk::Key::Delete, NONE, true), None);
     }
 
     #[test]
     fn enter_and_escape() {
-        assert_eq!(action_for(gdk::Key::Return, NONE, true), Some(Action::Choose));
-        assert_eq!(action_for(gdk::Key::KP_Enter, NONE, false), Some(Action::Choose));
-        assert_eq!(action_for(gdk::Key::Escape, NONE, true), Some(Action::Close));
+        assert_eq!(
+            action_for(gdk::Key::Return, NONE, true),
+            Some(Action::Choose)
+        );
+        assert_eq!(
+            action_for(gdk::Key::KP_Enter, NONE, false),
+            Some(Action::Choose)
+        );
+        assert_eq!(
+            action_for(gdk::Key::Escape, NONE, true),
+            Some(Action::Close)
+        );
     }
 }

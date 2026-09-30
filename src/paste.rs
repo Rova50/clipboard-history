@@ -33,7 +33,10 @@ pub fn paste_command(
         Session::Wayland => &[YDOTOOL, WTYPE],
         Session::X11 => &[YDOTOOL, XDOTOOL],
     };
-    candidates.iter().copied().find(|command| is_installed(command[0]))
+    candidates
+        .iter()
+        .copied()
+        .find(|command| is_installed(command[0]))
 }
 
 /// Simulates Ctrl+V in the focused window; does nothing without a tool.
@@ -47,7 +50,10 @@ pub fn auto_paste() {
         .stderr(Stdio::null())
         .spawn()
     {
-        eprintln!("clipboard-history: collage automatique impossible ({}) : {err}", command[0]);
+        eprintln!(
+            "clipboard-history: collage automatique impossible ({}) : {err}",
+            command[0]
+        );
     }
 }
 

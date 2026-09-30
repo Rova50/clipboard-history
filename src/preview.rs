@@ -6,7 +6,12 @@ const ELLIPSIS: char = '…';
 
 /// The text on a single line, cut after `max_chars` characters.
 pub fn one_line(text: &str, max_chars: usize) -> String {
-    let joined = text.trim().lines().map(str::trim).collect::<Vec<_>>().join(LINE_BREAK);
+    let joined = text
+        .trim()
+        .lines()
+        .map(str::trim)
+        .collect::<Vec<_>>()
+        .join(LINE_BREAK);
     match char_boundary(&joined, max_chars) {
         Some(cut) => format!("{}{ELLIPSIS}", &joined[..cut]),
         None => joined,
@@ -37,7 +42,10 @@ mod tests {
 
     #[test]
     fn line_breaks_are_shown_as_a_symbol() {
-        assert_eq!(one_line("  first\n  second  \nthird\n", 100), "first ⏎ second ⏎ third");
+        assert_eq!(
+            one_line("  first\n  second  \nthird\n", 100),
+            "first ⏎ second ⏎ third"
+        );
     }
 
     #[test]

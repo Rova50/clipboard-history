@@ -41,14 +41,18 @@ x11rb::atom_manager! {
 
 #[test]
 fn copied_text_is_reported() {
-    let Some(mut session) = Session::start() else { return };
+    let Some(mut session) = Session::start() else {
+        return;
+    };
     session.copy(Clip::text("bonjour"));
     assert_eq!(session.next_copy().as_deref(), Some("bonjour"));
 }
 
 #[test]
 fn copies_flagged_as_secret_are_skipped() {
-    let Some(mut session) = Session::start() else { return };
+    let Some(mut session) = Session::start() else {
+        return;
+    };
     session.copy(Clip::text("MotDePasse123!").secret());
     session.copy_after_a_while(Clip::text("après"));
     assert_eq!(session.next_copy().as_deref(), Some("après"));
@@ -56,7 +60,9 @@ fn copies_flagged_as_secret_are_skipped() {
 
 #[test]
 fn non_text_copies_are_skipped() {
-    let Some(mut session) = Session::start() else { return };
+    let Some(mut session) = Session::start() else {
+        return;
+    };
     session.copy(Clip::image());
     session.copy_after_a_while(Clip::text("après"));
     assert_eq!(session.next_copy().as_deref(), Some("après"));
@@ -64,7 +70,9 @@ fn non_text_copies_are_skipped() {
 
 #[test]
 fn large_copies_sent_in_chunks_are_reassembled() {
-    let Some(mut session) = Session::start() else { return };
+    let Some(mut session) = Session::start() else {
+        return;
+    };
     let large = "y".repeat(300_000);
     session.copy(Clip::text(&large).chunked());
     assert_eq!(session.next_copy(), Some(large));
@@ -72,7 +80,9 @@ fn large_copies_sent_in_chunks_are_reassembled() {
 
 #[test]
 fn oversized_copies_are_skipped() {
-    let Some(mut session) = Session::start() else { return };
+    let Some(mut session) = Session::start() else {
+        return;
+    };
     session.copy(Clip::text(&"x".repeat(MAX_ENTRY_BYTES + 1)));
     session.copy_after_a_while(Clip::text("après"));
     assert_eq!(session.next_copy().as_deref(), Some("après"));
@@ -80,11 +90,16 @@ fn oversized_copies_are_skipped() {
 
 #[test]
 fn oversized_chunked_copies_are_received_to_the_end_then_skipped() {
-    let Some(mut session) = Session::start() else { return };
+    let Some(mut session) = Session::start() else {
+        return;
+    };
     session.copy(Clip::text(&"x".repeat(MAX_ENTRY_BYTES + 1)).chunked());
     session.copy_after_a_while(Clip::text("après"));
     assert_eq!(session.next_copy().as_deref(), Some("après"));
-    assert!(session.owner.transfers.is_empty(), "the owner must not be left waiting");
+    assert!(
+        session.owner.transfers.is_empty(),
+        "the owner must not be left waiting"
+    );
 }
 
 // ---------------------------------------------------------------- harness
@@ -102,7 +117,11 @@ impl Session {
         let owner = Owner::connect(&xvfb.display);
         let (sender, copies) = async_channel::unbounded();
         x11_watch::spawn(Some(xvfb.display.clone()), sender);
-        let mut session = Self { owner, copies, _xvfb: xvfb };
+        let mut session = Self {
+            owner,
+            copies,
+            _xvfb: xvfb,
+        };
         // Let the watcher finish its startup read of the (empty) clipboard.
         session.serve_for(Duration::from_millis(300));
         Some(session)
@@ -168,7 +187,10 @@ impl Xvfb {
         BufReader::new(process.stdout.take().expect("piped stdout"))
             .read_line(&mut number)
             .expect("display number from Xvfb");
-        Some(Self { process, display: format!(":{}", number.trim()) })
+        Some(Self {
+            process,
+            display: format!(":{}", number.trim()),
+        })
     }
 }
 
@@ -201,19 +223,33 @@ struct Clip {
 
 impl Clip {
     fn text(text: &str) -> Self {
-        Self { data: text.as_bytes().to_vec(), kind: Kind::Text, delivery: Delivery::AtOnce }
+        Self {
+            data: text.as_bytes().to_vec(),
+            kind: Kind::Text,
+            delivery: Delivery::AtOnce,
+        }
     }
 
     fn image() -> Self {
-        Self { data: vec![0x89, b'P', b'N', b'G'], kind: Kind::Image, delivery: Delivery::AtOnce }
+        Self {
+            data: vec![0x89, b'P', b'N', b'G'],
+            kind: Kind::Image,
+            delivery: Delivery::AtOnce,
+        }
     }
 
     fn secret(self) -> Self {
-        Self { kind: Kind::Secret, ..self }
+        Self {
+            kind: Kind::Secret,
+            ..self
+        }
     }
 
     fn chunked(self) -> Self {
-        Self { delivery: Delivery::Chunked, ..self }
+        Self {
+            delivery: Delivery::Chunked,
+            ..self
+        }
     }
 }
 
@@ -255,7 +291,13 @@ impl Owner {
         )
         .unwrap();
         let atoms = Atoms::new(&conn).unwrap().reply().unwrap();
-        Self { conn, window, atoms, clip: None, transfers: Vec::new() }
+        Self {
+            conn,
+            window,
+            atoms,
+            clip: None,
+            transfers: Vec::new(),
+        }
     }
 
     fn copy(&mut self, clip: Clip) {
@@ -289,7 +331,11 @@ impl Owner {
     }
 
     fn answer(&mut self, request: &SelectionRequestEvent) {
-        let property = if request.property == NONE { request.target } else { request.property };
+        let property = if request.property == NONE {
+            request.target
+        } else {
+            request.property
+        };
         let answered = self.write_answer(request, property);
         let notify = SelectionNotifyEvent {
             response_type: SELECTION_NOTIFY_EVENT,
@@ -300,7 +346,9 @@ impl Owner {
             target: request.target,
             property: if answered { property } else { NONE },
         };
-        self.conn.send_event(false, request.requestor, EventMask::NO_EVENT, notify).unwrap();
+        self.conn
+            .send_event(false, request.requestor, EventMask::NO_EVENT, notify)
+            .unwrap();
     }
 
     /// Writes the requested data; false if the target is not offered.
@@ -309,7 +357,13 @@ impl Owner {
         let targets = self.targets(clip);
         if request.target == self.atoms.TARGETS {
             self.conn
-                .change_property32(PropMode::REPLACE, request.requestor, property, AtomEnum::ATOM, &targets)
+                .change_property32(
+                    PropMode::REPLACE,
+                    request.requestor,
+                    property,
+                    AtomEnum::ATOM,
+                    &targets,
+                )
                 .unwrap();
             return true;
         }
@@ -320,7 +374,13 @@ impl Owner {
         match delivery {
             Delivery::AtOnce => {
                 self.conn
-                    .change_property8(PropMode::REPLACE, request.requestor, property, request.target, &data)
+                    .change_property8(
+                        PropMode::REPLACE,
+                        request.requestor,
+                        property,
+                        request.target,
+                        &data,
+                    )
                     .unwrap();
             }
             Delivery::Chunked => self.start_transfer(request.requestor, property, data),
@@ -337,9 +397,20 @@ impl Owner {
             )
             .unwrap();
         self.conn
-            .change_property32(PropMode::REPLACE, requestor, property, self.atoms.INCR, &[data.len() as u32])
+            .change_property32(
+                PropMode::REPLACE,
+                requestor,
+                property,
+                self.atoms.INCR,
+                &[data.len() as u32],
+            )
             .unwrap();
-        self.transfers.push(Transfer { requestor, property, data, sent: 0 });
+        self.transfers.push(Transfer {
+            requestor,
+            property,
+            data,
+            sent: 0,
+        });
     }
 
     fn send_next_chunk(&mut self, requestor: Window, property: Atom) {
@@ -355,7 +426,13 @@ impl Owner {
         let chunk = transfer.data[transfer.sent..end].to_vec();
         transfer.sent = end;
         self.conn
-            .change_property8(PropMode::REPLACE, requestor, property, self.atoms.UTF8_STRING, &chunk)
+            .change_property8(
+                PropMode::REPLACE,
+                requestor,
+                property,
+                self.atoms.UTF8_STRING,
+                &chunk,
+            )
             .unwrap();
         // The final, empty chunk ends the transfer.
         if chunk.is_empty() {
