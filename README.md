@@ -113,3 +113,7 @@ Organisation :
 | `src/app.rs` | processus d'arrière-plan GTK, relais des commandes | oui |
 | `src/picker.rs` | fenêtre de sélection | oui |
 | `src/shortcut.rs` | raccourci GNOME | oui |
+
+## Licence
+
+MIT — voir [LICENSE](LICENSE).

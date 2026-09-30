@@ -29,4 +29,5 @@ assets = [
     ["target/release/clipboard-history", "usr/bin/", "755"],
     ["packaging/clipboard-history.desktop", "etc/xdg/autostart/", "644"],
     ["README.md", "usr/share/doc/clipboard-history/", "644"],
+    ["LICENSE", "usr/share/doc/clipboard-history/", "644"],
 ]
