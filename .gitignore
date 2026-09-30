@@ -1,0 +1,8 @@
+# Build output of cargo, including the .deb packages (target/debian/)
+/target/
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*~

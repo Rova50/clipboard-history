@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Clipboard History
+Name[fr]=Historique du presse-papiers
+Comment=Clipboard history of the session (Super+V)
+Comment[fr]=Historique des copies de la session (Super+V)
+Exec=clipboard-history --daemon
+X-GNOME-Autostart-enabled=true
+NoDisplay=true

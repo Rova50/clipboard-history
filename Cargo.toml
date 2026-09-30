@@ -1,0 +1,32 @@
+[package]
+name = "clipboard-history"
+version = "0.1.0"
+edition = "2024"
+description = "Clipboard history of the session, opened with Super+V"
+license = "MIT"
+readme = "README.md"
+
+[dependencies]
+async-channel = "2.5.0"
+gtk = { version = "0.11.5", package = "gtk4" }
+x11rb = { version = "0.14.0", features = ["xfixes"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
+[package.metadata.deb]
+maintainer = "Vatilab <rarazafiharivony@macompta.fr>"
+section = "utils"
+priority = "optional"
+depends = "$auto"
+extended-description = """\
+Keeps the text copied with Ctrl+C during the session and lets you pick one \
+with Super+V. The history is kept in memory only. Copies flagged as secret \
+by password managers and texts larger than 1 MB are ignored."""
+assets = [
+    ["target/release/clipboard-history", "usr/bin/", "755"],
+    ["packaging/clipboard-history.desktop", "etc/xdg/autostart/", "644"],
+    ["README.md", "usr/share/doc/clipboard-history/", "644"],
+]
