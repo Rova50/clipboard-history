@@ -25,6 +25,7 @@ extended-description = """\
 Keeps the text copied with Ctrl+C during the session and lets you pick one \
 with Super+V. The history is kept in memory only. Copies flagged as secret \
 by password managers and texts larger than 1 MB are ignored."""
+maintainer-scripts = "packaging/debian/"
 assets = [
     ["target/release/clipboard-history", "usr/bin/", "755"],
     ["packaging/clipboard-history.desktop", "etc/xdg/autostart/", "644"],

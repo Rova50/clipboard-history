@@ -1,0 +1,46 @@
+#!/bin/sh
+# Runs before the package is removed, while the program still exists.
+#
+# A package cannot reach the users' GNOME settings, so without this the Super+V
+# shortcut would keep pointing to a program that no longer exists. For each
+# user who had the shortcut configured (marker file), the program itself
+# removes it, running as that user.
+set -e
+
+MARKER=.config/clipboard-history/shortcut-installed
+PROGRAM=/usr/bin/clipboard-history
+
+# Runs a command as $1, with the given home, in a minimal environment.
+as_user() {
+    user=$1 home=$2
+    shift 2
+    runuser -u "$user" -- env -i HOME="$home" USER="$user" LOGNAME="$user" \
+        PATH=/usr/bin:/bin "$@"
+}
+
+remove_shortcut() {
+    user=$1 uid=$2 home=$3
+    bus=/run/user/$uid/bus
+    if [ -S "$bus" ]; then
+        # Logged in: go through the session, so GNOME applies it at once.
+        as_user "$user" "$home" XDG_RUNTIME_DIR="/run/user/$uid" \
+            DBUS_SESSION_BUS_ADDRESS="unix:path=$bus" "$PROGRAM" remove-shortcut
+    else
+        # Logged out: a temporary session writes to the user's settings file.
+        as_user "$user" "$home" dbus-run-session -- "$PROGRAM" remove-shortcut
+    fi
+}
+
+if [ "$1" = remove ]; then
+    getent passwd | while IFS=: read -r user _ uid _ _ home _; do
+        [ -f "$home/$MARKER" ] || continue
+        if ! remove_shortcut "$user" "$uid" "$home" >/dev/null 2>&1; then
+            echo "clipboard-history : raccourci non retiré pour $user ;" \
+                "lancez « clipboard-history remove-shortcut » avant de désinstaller." >&2
+        fi
+        # The background process would otherwise run until the end of the session.
+        pkill -u "$user" -f "^$PROGRAM" || true
+    done
+fi
+
+exit 0
