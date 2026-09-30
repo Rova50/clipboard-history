@@ -65,9 +65,12 @@ Pour que le collage soit automatique, installer un outil de simulation clavier :
 ## Désinstallation
 
 ```bash
-clipboard-history remove-shortcut
 sudo apt remove clipboard-history
 ```
+
+Le paquet retire le raccourci Super+V (et le rend aux notifications) pour chaque utilisateur qui
+l'avait, connecté ou non, et arrête le programme en cours. Seule exception : un utilisateur dont
+`XDG_CONFIG_HOME` n'est pas `~/.config` doit lancer `clipboard-history remove-shortcut` avant.
 
 ## Développement
 
@@ -81,8 +84,9 @@ cargo install cargo-deb && cargo deb   # target/debian/*.deb
 ### Intégration continue
 
 `.github/workflows/ci.yml`, sur Ubuntu 22.04 (le paquet fonctionne ainsi sur toutes les versions
-plus récentes) : `cargo fmt --check`, `clippy`, tests (X11 compris, sous Xvfb) et paquet `.deb`,
-téléchargeable dans les *artifacts* de chaque exécution.
+plus récentes) : `cargo fmt --check`, `clippy`, tests (X11 compris, sous Xvfb), paquet `.deb`
+(téléchargeable dans les *artifacts* de chaque exécution), puis installation et désinstallation
+du paquet dans un conteneur propre (`packaging/test-package.sh`).
 
 Publier une version :
 
