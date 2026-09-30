@@ -31,10 +31,16 @@ GNOME utilise Super+V pour la liste des notifications, qui reste accessible avec
 | ↑ / ↓, Tab | défiler |
 | taper du texte | filtrer |
 | Entrée / clic | mettre l'entrée dans le presse-papiers et coller |
+| Ctrl+P ou clic sur ☆ | épingler l'entrée dans les favoris (ou l'en retirer) |
 | Suppr | retirer l'entrée |
 | Échap | fermer |
 
-L'historique est en mémoire uniquement (100 entrées max, texte seulement) : il disparaît à la fin de la session.
+L'historique de la session est en mémoire uniquement (100 entrées max, texte seulement) : il disparaît
+à la fin de la session.
+
+Les **favoris** (entrées épinglées) sont affichés en tête de liste et sont les seules entrées gardées
+d'une session à l'autre, dans `~/.local/share/clipboard-history/favorites.json` (lisible par vous seul).
+Rien n'y est écrit sans que vous ayez épinglé l'entrée.
 
 Ne sont pas enregistrés :
 - les copies marquées comme secrètes par les gestionnaires de mots de passe (KeePassXC, Bitwarden, 1Password…) ;
@@ -45,7 +51,7 @@ Commandes :
 ```
 clipboard-history show               ouvrir la liste
 clipboard-history list               afficher l'historique dans le terminal
-clipboard-history clear              vider l'historique
+clipboard-history clear              vider l'historique de la session (les favoris sont gardés)
 clipboard-history install-shortcut   associer Super+V (GNOME)
 clipboard-history remove-shortcut    retirer le raccourci et rendre Super+V aux notifications
 ```
@@ -109,7 +115,8 @@ Organisation :
 
 | Fichier | Rôle | Dépend de GTK |
 |---|---|---|
-| `src/history.rs` | historique : ordre, doublons, capacité, taille max | non |
+| `src/history.rs` | historique : favoris, ordre, doublons, capacité, taille max | non |
+| `src/favorites.rs` | sauvegarde des favoris sur le disque | non |
 | `src/preview.rs` | aperçu sur une ligne, recherche | non |
 | `src/cli.rs` | commandes | non |
 | `src/paste.rs` | choix de l'outil de collage automatique | non |

@@ -9,7 +9,7 @@ Commandes :
   show               ouvrir la liste (commande associée à Super+V, par défaut)
   --daemon           démarrer la surveillance en arrière-plan (au login)
   list               afficher l'historique dans le terminal
-  clear              vider l'historique
+  clear              vider l'historique de la session (les favoris sont gardés)
   install-shortcut   associer Super+V (GNOME)
   remove-shortcut    retirer le raccourci et rendre Super+V aux notifications
   -h, --help         afficher cette aide

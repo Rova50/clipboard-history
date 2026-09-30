@@ -8,7 +8,8 @@ use std::ffi::{CString, c_char};
 use std::rc::Rc;
 
 use clipboard_history::cli::{Command, USAGE};
-use clipboard_history::history::History;
+use clipboard_history::favorites::{FavoritesFile, LoadError};
+use clipboard_history::history::{DEFAULT_CAPACITY, History};
 use clipboard_history::x11_watch;
 use gtk::prelude::*;
 use gtk::{gdk, gio, glib};
@@ -22,12 +23,61 @@ window.clip-history { border-radius: 10px; }
 .clip-history list row { padding: 6px 10px; }
 .clip-history .index { opacity: 0.5; font-family: monospace; }
 .clip-history .hint { opacity: 0.6; font-size: small; }
+.clip-history .pin { min-height: 0; min-width: 0; padding: 2px; opacity: 0.35; }
+.clip-history row:hover .pin, .clip-history .pinned .pin { opacity: 1; }
+.clip-history .pinned .pin { color: @accent_color; }
 ";
 
 #[derive(Default)]
 pub struct State {
     pub history: History,
     pub picker: Option<gtk::ApplicationWindow>,
+    /// None until loaded, or if the file must not be overwritten.
+    favorites_file: Option<FavoritesFile>,
+}
+
+impl State {
+    /// Restores the favorites of previous sessions.
+    fn load_favorites(&mut self) {
+        let file = FavoritesFile::in_data_dir(&glib::user_data_dir());
+        let favorites = match file.load() {
+            Ok(favorites) => favorites,
+            Err(err @ LoadError::MovedAside(_)) => {
+                eprintln!("clipboard-history: favoris : {err}");
+                Vec::new()
+            }
+            Err(err @ LoadError::Unreadable(_)) => {
+                eprintln!("clipboard-history: favoris non sauvegardés cette session : {err}");
+                return;
+            }
+        };
+        self.history = History::with_favorites(DEFAULT_CAPACITY, favorites);
+        self.favorites_file = Some(file);
+    }
+
+    /// Pins or unpins `text`; returns whether it is now a favorite.
+    pub fn toggle_pin(&mut self, text: &str) -> bool {
+        let pinned = self.history.toggle_pin(text);
+        self.save_favorites();
+        pinned
+    }
+
+    pub fn remove(&mut self, text: &str) {
+        let was_pinned = self.history.is_pinned(text);
+        self.history.remove(text);
+        if was_pinned {
+            self.save_favorites();
+        }
+    }
+
+    fn save_favorites(&self) {
+        let Some(file) = &self.favorites_file else {
+            return;
+        };
+        if let Err(err) = file.save(self.history.favorites()) {
+            eprintln!("clipboard-history: {err}");
+        }
+    }
 }
 
 pub type SharedState = Rc<RefCell<State>>;
@@ -65,6 +115,7 @@ fn configure_gtk_environment() {
 fn start_daemon(app: &gtk::Application, state: &SharedState) {
     // Keep running without any window.
     std::mem::forget(app.hold());
+    state.borrow_mut().load_favorites();
     install_css();
     record_copies(state.clone());
     shortcut::install_once();
@@ -116,8 +167,9 @@ fn execute(
 }
 
 fn print_history(cmdline: &gio::ApplicationCommandLine, history: &History) {
-    for (i, text) in history.entries().iter().enumerate() {
-        print_output(cmdline, &format!("{:>3}  {text:?}\n", i + 1));
+    for (i, entry) in history.entries().iter().enumerate() {
+        let star = if entry.pinned { "★" } else { " " };
+        print_output(cmdline, &format!("{:>3} {star} {:?}\n", i + 1, entry.text));
     }
 }
 

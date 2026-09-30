@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
+use clipboard_history::history::Entry;
 use clipboard_history::{paste, preview};
 use gtk::prelude::*;
 use gtk::{gdk, glib};
@@ -23,11 +24,13 @@ enum Action {
     Previous,
     Choose,
     Remove,
+    TogglePin,
 }
 
 /// Maps a key press to an action; None lets the search field handle it.
 fn action_for(key: gdk::Key, modifiers: gdk::ModifierType, searching: bool) -> Option<Action> {
     let super_held = modifiers.contains(gdk::ModifierType::SUPER_MASK);
+    let ctrl_held = modifiers.contains(gdk::ModifierType::CONTROL_MASK);
     match key {
         gdk::Key::Escape => Some(Action::Close),
         gdk::Key::Down | gdk::Key::Tab => Some(Action::Next),
@@ -35,6 +38,7 @@ fn action_for(key: gdk::Key, modifiers: gdk::ModifierType, searching: bool) -> O
         gdk::Key::Up | gdk::Key::ISO_Left_Tab => Some(Action::Previous),
         gdk::Key::Return | gdk::Key::KP_Enter => Some(Action::Choose),
         gdk::Key::Delete if !searching => Some(Action::Remove),
+        gdk::Key::p | gdk::Key::P if ctrl_held => Some(Action::TogglePin),
         _ => None,
     }
 }
@@ -57,7 +61,7 @@ struct Picker {
     list: gtk::ListBox,
     scroller: gtk::ScrolledWindow,
     /// Snapshot of the history, indexed like the list rows.
-    entries: RefCell<Vec<String>>,
+    entries: RefCell<Vec<Entry>>,
 }
 
 impl Picker {
@@ -72,18 +76,13 @@ impl Picker {
             .child(&list)
             .build();
         let window = build_window(app, &search, &scroller);
-
-        let entries = state.borrow().history.entries().to_vec();
-        for (i, text) in entries.iter().enumerate() {
-            list.append(&build_row(i, text));
-        }
         Rc::new(Self {
             state: state.clone(),
             window,
             search,
             list,
             scroller,
-            entries: RefCell::new(entries),
+            entries: RefCell::default(),
         })
     }
 
@@ -94,8 +93,9 @@ impl Picker {
         self.connect_closing();
     }
 
-    fn open(&self) {
+    fn open(self: &Rc<Self>) {
         self.state.borrow_mut().picker = Some(self.window.clone());
+        self.reload();
         self.select_first();
         self.window.present();
         self.search.grab_focus();
@@ -156,7 +156,7 @@ impl Picker {
 
     // ------------------------------------------------------------ actions
 
-    fn perform(&self, action: Action) {
+    fn perform(self: &Rc<Self>, action: Action) {
         match action {
             Action::Close => self.window.close(),
             Action::Next => self.select_relative(1),
@@ -167,11 +167,12 @@ impl Picker {
                 }
             }
             Action::Remove => self.remove_selected(),
+            Action::TogglePin => self.toggle_pin_selected(),
         }
     }
 
     fn choose(&self, row: &gtk::ListBoxRow) {
-        let Some(text) = self.entry_of(row) else {
+        let Some(Entry { text, .. }) = self.entry_of(row) else {
             return;
         };
         WidgetExt::display(&self.window).clipboard().set_text(&text);
@@ -184,8 +185,8 @@ impl Picker {
         let Some(row) = self.list.selected_row() else {
             return;
         };
-        let text = self.entries.borrow_mut().remove(row.index() as usize);
-        self.state.borrow_mut().history.remove(&text);
+        let entry = self.entries.borrow_mut().remove(row.index() as usize);
+        self.state.borrow_mut().remove(&entry.text);
         self.select_relative(1);
         self.list.remove(&row);
         if self.list.row_at_index(0).is_none() {
@@ -193,9 +194,88 @@ impl Picker {
         }
     }
 
+    fn toggle_pin_selected(self: &Rc<Self>) {
+        if let Some(entry) = self
+            .selected_visible_row()
+            .and_then(|row| self.entry_of(&row))
+        {
+            self.toggle_pin(&entry.text);
+        }
+    }
+
+    /// Favorites move to the top: the list is rebuilt, keeping the selection.
+    fn toggle_pin(self: &Rc<Self>, text: &str) {
+        self.state.borrow_mut().toggle_pin(text);
+        self.reload();
+        self.select_text(text);
+    }
+
+    // ------------------------------------------------------------ rows
+
+    /// Fills the list from the history.
+    fn reload(self: &Rc<Self>) {
+        while let Some(row) = self.list.row_at_index(0) {
+            self.list.remove(&row);
+        }
+        let entries = self.state.borrow().history.entries();
+        for (index, entry) in entries.iter().enumerate() {
+            self.list.append(&self.build_row(index, entry));
+        }
+        *self.entries.borrow_mut() = entries;
+    }
+
+    fn build_row(self: &Rc<Self>, index: usize, entry: &Entry) -> gtk::ListBoxRow {
+        let number = gtk::Label::new(Some(&format!("{:>2}", index + 1)));
+        number.add_css_class("index");
+        let label = gtk::Label::builder()
+            .label(preview::one_line(&entry.text, PREVIEW_CHARS))
+            .xalign(0.0)
+            .hexpand(true)
+            .ellipsize(gtk::pango::EllipsizeMode::End)
+            .build();
+
+        let content = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+        content.append(&number);
+        content.append(&label);
+        content.append(&self.build_pin_button(entry));
+        let row = gtk::ListBoxRow::builder()
+            .child(&content)
+            .tooltip_text(preview::first_chars(&entry.text, TOOLTIP_CHARS))
+            .build();
+        if entry.pinned {
+            row.add_css_class("pinned");
+        }
+        row
+    }
+
+    fn build_pin_button(self: &Rc<Self>, entry: &Entry) -> gtk::Button {
+        let (icon, tooltip) = if entry.pinned {
+            ("starred-symbolic", "Retirer des favoris (Ctrl+P)")
+        } else {
+            ("non-starred-symbolic", "Épingler dans les favoris (Ctrl+P)")
+        };
+        let button = gtk::Button::builder()
+            .icon_name(icon)
+            .tooltip_text(tooltip)
+            .has_frame(false)
+            .focus_on_click(false)
+            .valign(gtk::Align::Center)
+            .build();
+        button.add_css_class("pin");
+        // Weak: the rows belong to the picker.
+        let picker = Rc::downgrade(self);
+        let text = entry.text.clone();
+        button.connect_clicked(move |_| {
+            if let Some(picker) = picker.upgrade() {
+                picker.toggle_pin(&text);
+            }
+        });
+        button
+    }
+
     // ------------------------------------------------------------ selection
 
-    fn entry_of(&self, row: &gtk::ListBoxRow) -> Option<String> {
+    fn entry_of(&self, row: &gtk::ListBoxRow) -> Option<Entry> {
         self.entries.borrow().get(row.index() as usize).cloned()
     }
 
@@ -204,7 +284,7 @@ impl Picker {
         self.entries
             .borrow()
             .get(row.index() as usize)
-            .is_none_or(|text| preview::matches(text, &query))
+            .is_none_or(|entry| preview::matches(&entry.text, &query))
     }
 
     fn visible_rows(&self) -> Vec<gtk::ListBoxRow> {
@@ -218,6 +298,14 @@ impl Picker {
         self.list
             .selected_row()
             .filter(|row| row.is_child_visible())
+    }
+
+    fn select_text(&self, text: &str) {
+        let index = self.entries.borrow().iter().position(|e| e.text == text);
+        if let Some(row) = index.and_then(|i| self.list.row_at_index(i as i32)) {
+            self.list.select_row(Some(&row));
+            self.scroll_to(&row);
+        }
     }
 
     fn select_first(&self) {
@@ -264,7 +352,7 @@ fn build_window(
     scroller: &gtk::ScrolledWindow,
 ) -> gtk::ApplicationWindow {
     let hint = gtk::Label::new(Some(
-        "↑/↓ défiler · Entrée coller · Suppr retirer · Échap fermer",
+        "↑/↓ défiler · Entrée coller · Ctrl+P épingler · Suppr retirer · Échap fermer",
     ));
     hint.add_css_class("hint");
 
@@ -301,25 +389,6 @@ fn build_list() -> gtk::ListBox {
         "Aucune copie dans cette session",
     ))));
     list
-}
-
-fn build_row(index: usize, text: &str) -> gtk::ListBoxRow {
-    let number = gtk::Label::new(Some(&format!("{:>2}", index + 1)));
-    number.add_css_class("index");
-    let label = gtk::Label::builder()
-        .label(preview::one_line(text, PREVIEW_CHARS))
-        .xalign(0.0)
-        .hexpand(true)
-        .ellipsize(gtk::pango::EllipsizeMode::End)
-        .build();
-
-    let content = gtk::Box::new(gtk::Orientation::Horizontal, 10);
-    content.append(&number);
-    content.append(&label);
-    gtk::ListBoxRow::builder()
-        .child(&content)
-        .tooltip_text(preview::first_chars(text, TOOLTIP_CHARS))
-        .build()
 }
 
 #[cfg(test)]
@@ -363,6 +432,13 @@ mod tests {
             Some(Action::Remove)
         );
         assert_eq!(action_for(gdk::Key::Delete, NONE, true), None);
+    }
+
+    #[test]
+    fn ctrl_p_pins_even_while_searching() {
+        let ctrl = gdk::ModifierType::CONTROL_MASK;
+        assert_eq!(action_for(gdk::Key::p, ctrl, true), Some(Action::TogglePin));
+        assert_eq!(action_for(gdk::Key::p, NONE, true), None);
     }
 
     #[test]

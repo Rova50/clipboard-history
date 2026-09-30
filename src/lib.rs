@@ -4,6 +4,7 @@
 //! tested without a desktop. The binary adds the GTK picker on top.
 
 pub mod cli;
+pub mod favorites;
 pub mod history;
 pub mod paste;
 pub mod preview;
