@@ -167,8 +167,13 @@ struct Xvfb {
 impl Xvfb {
     fn start() -> Option<Self> {
         let server = std::env::var("CLIPBOARD_HISTORY_X_SERVER").unwrap_or("Xvfb".into());
-        let spawned = Command::new(server)
-            .args(["-displayfd", "1", "-nolisten", "tcp", "-screen", "64x64"])
+        let screen: &[&str] = match server.as_str() {
+            "Xvfb" => &["-screen", "0", "64x64x24"],
+            _ => &["-screen", "64x64"], // Xephyr: size of its window
+        };
+        let spawned = Command::new(&server)
+            .args(["-displayfd", "1", "-nolisten", "tcp"])
+            .args(screen)
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn();
@@ -187,6 +192,10 @@ impl Xvfb {
         BufReader::new(process.stdout.take().expect("piped stdout"))
             .read_line(&mut number)
             .expect("display number from Xvfb");
+        assert!(
+            !number.trim().is_empty(),
+            "{server} s'est arrêté sans ouvrir d'écran (arguments refusés ?)"
+        );
         Some(Self {
             process,
             display: format!(":{}", number.trim()),

@@ -6,10 +6,12 @@ Un seul exécutable Rust (~650 Ko) qui ne dépend que de GTK 4, présent sur les
 
 ## Installation
 
-### Paquet Debian / Ubuntu
+### Paquet Debian / Ubuntu (Ubuntu 22.04+, Debian 12+, Linux Mint 21+)
+
+Télécharger `clipboard-history_amd64.deb` depuis la page *Releases* du dépôt, puis :
 
 ```bash
-sudo apt install ./clipboard-history_0.1.0-1_amd64.deb
+sudo apt install ./clipboard-history_amd64.deb
 clipboard-history --daemon &    # ou fermer puis rouvrir la session
 ```
 
@@ -75,6 +77,24 @@ cargo build --release                  # target/release/clipboard-history
 cargo test                             # tests unitaires + tests X11 (Xvfb)
 cargo install cargo-deb && cargo deb   # target/debian/*.deb
 ```
+
+### Intégration continue
+
+`.github/workflows/ci.yml`, sur Ubuntu 22.04 (le paquet fonctionne ainsi sur toutes les versions
+plus récentes) : `cargo fmt --check`, `clippy`, tests (X11 compris, sous Xvfb) et paquet `.deb`,
+téléchargeable dans les *artifacts* de chaque exécution.
+
+Publier une version :
+
+```bash
+# 1. mettre à jour `version` dans Cargo.toml, puis :
+git commit -am "Version 0.2.0"
+git tag v0.2.0 && git push origin main v0.2.0
+```
+
+La CI vérifie que le tag correspond à la version de `Cargo.toml`, puis crée la *Release* GitHub avec le `.deb`.
+
+### Tests
 
 Les tests X11 (`tests/x11_watch.rs`) lancent leur propre serveur X sans écran et jouent le rôle
 de l'application qui copie : ils ne touchent jamais au presse-papiers de la session.
